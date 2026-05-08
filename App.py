@@ -44,7 +44,8 @@ GRUPOS = {
     "Grupo I": ['FRA', 'SEN', 'IRQ', 'NOR'],
     "Grupo J": ['ARG', 'ALG', 'AUT', 'JOR'],
     "Grupo K": ['POR', 'COD', 'UZB', 'COL'],
-    "Grupo L": ['ENG', 'CRO', 'GHA', 'PAN']
+    "Grupo L": ['ENG', 'CRO', 'GHA', 'PAN'],
+    "Especiales": ['FWC', 'CC']
 }
 
 COLORS = {"Falta": "#FF4B4B", "Tengo": "#14A8FD", "Repetida": "#51D153"}
