@@ -116,6 +116,10 @@ def mostrar_resumen():
     c2.metric("Estampas Pegadas", cant_tengo)
     c3.metric("Faltantes", total_album - cant_tengo)
     c4.metric("Selecciones Completas", f"{completadas}/{len(CONFIG_ALBUM)}")
+
+    fig = px.pie(names=["Tengo", "Faltan"], values=[cant_tengo, total_album - cant_tengo], hole=0.5,
+                 color_discrete_sequence=[COLORS["Tengo"], COLORS["Falta"]], title=f"Progreso {op_g}")
+    st.plotly_chart(fig, use_container_width=True)
     
     st.divider()
     modo = st.radio("Analizar por:", ["Grupos", "Selección Específica"], horizontal=True)
