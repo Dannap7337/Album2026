@@ -323,27 +323,27 @@ if st.session_state.user is None:
                     st.rerun()
             except:
                 st.sidebar.error("Credenciales incorrrectas")
-        elif modo == "Registrarme":
-            pw = st.sidebar.text_input("Contraseña", type="password")
-            if st.sidebar.button("Crear Cuenta", use_container_width=True):
-                try:
-                    res = supabase.auth.sign_up({"email": em, "password": pw})
-                    if res.user:
-                        st.session_state.user = res.user
-                        st.sidebar.success("¡Cuenta creada!")
-                        st.rerun()
-                except:
-                    st.sidebar.error("Error al registrar (quizás el usuario ya existe)")
+    elif modo == "Registrarme":
+        pw = st.sidebar.text_input("Contraseña", type="password")
+        if st.sidebar.button("Crear Cuenta", use_container_width=True):
+            try:
+                res = supabase.auth.sign_up({"email": em, "password": pw})
+                if res.user:
+                    st.session_state.user = res.user
+                    st.sidebar.success("¡Cuenta creada!")
+                    st.rerun()
+            except:
+                st.sidebar.error("Error al registrar (quizás el usuario ya existe)")
                     
-        elif modo == "Olvidé mi contraseña":
-            st.sidebar.info("Te enviaremos un correo para que eligas una nueva clave.")
-            if st.sidebar.button("Enviar correo", use_container_width=True):
-                if em:
-                    try:
-                        url_actual = st.secrets.get("URL_PROD", "http://Localhost:8501")
-                        supabase.auth.reset_password_for_email(em, {"redirect_to": url_actual})
-                        st.sidebar.success(f"Correo enviado a {em}")
-                    except Exception as e:
-                        st.sidebar.error(f"Error al enviar: {e}")
-                else:
+    elif modo == "Olvidé mi contraseña":
+        st.sidebar.info("Te enviaremos un correo para que eligas una nueva clave.")
+        if st.sidebar.button("Enviar correo", use_container_width=True):
+            if em:
+                try:
+                    url_actual = st.secrets.get("URL_PROD", "http://Localhost:8501")
+                    supabase.auth.reset_password_for_email(em, {"redirect_to": url_actual})
+                    st.sidebar.success(f"Correo enviado a {em}")
+                except Exception as e:
+                    st.sidebar.error(f"Error al enviar: {e}")
+            else:
                     st.sidebar.warning("Por favor ingresa tu email primero")
