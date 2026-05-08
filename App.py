@@ -260,21 +260,37 @@ def mostrar_exportar():
         st.subheader("💎 Mis Repetidas")
         st.dataframe(df_r, use_container_width=True, height=400)
 
+def login_usuario(em, pw):
+    try:
+        res = supabase.auth.sign_in_with_password({"email": em, "password": pw})
+        if res.user:
+            st.session_state.user = res.user
+            st.success("¡Bienvenido!")
+            st.rerun()  # Forzamos el reinicio limpio con el usuario ya en estado
+    except Exception as e:
+        st.error(f"Error de inicio de sesión: Verifique sus credenciales")
+
 # --- NAVEGACIÓN ---
 if st.session_state.user is None:
     st.title("👋 Panini Hub")
     st.sidebar.title("🔐 Acceso")
-    em, pw = st.sidebar.text_input("Email"), st.sidebar.text_input("Pass", type="password")
-    if st.sidebar.button("Entrar"):
-        try:
-            res = supabase.auth.sign_in_with_password({"email": em, "password": pw})
-            st.session_state.user = res.user; st.rerun()
-        except: st.error("Error")
-    if st.sidebar.button("Registrar"):
+    em = st.sidebar.text_input("Email")
+    pw = st.sidebar.text_input("Pass", type="password")
+    
+    col1, col2 = st.sidebar.columns(2)
+    if col1.button("Entrar"):
+        login_usuario(em, pw)
+        
+    if col2.button("Registrar"):
         try:
             res = supabase.auth.sign_up({"email": em, "password": pw})
-            st.session_state.user = res.user; st.rerun()
-        except: st.error("Error")
+            if res.user:
+                st.session_state.user = res.user
+                st.success("Cuenta creada")
+                st.rerun()
+        except:
+            st.error("Error al registrar")
+
 else:
     st.sidebar.write(f"👤 {st.session_state.user.email}")
     st.sidebar.button("Cerrar Sesión", on_click=callback_logout)
