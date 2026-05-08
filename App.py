@@ -1,21 +1,10 @@
 import streamlit as st
-import streamlit.components.v1 as components
 from supabase import create_client, Client
 import pandas as pd
 import plotly.express as px
 import io
 
-components.html(
-    """
-    <script>
-    if (window.parent.location.hash && window.parent.location.hash.includes("access_token")) {
-        var new_url = window.parent.location.href.replace('#', '?');
-        window.parent.location.replace(new_url);
-    }
-    </script>
-    """,
-    height=0, width=0
-)
+
 # 1. CONEXIÓN A SUPABASE
 url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
@@ -284,45 +273,15 @@ def login_usuario(em, pw):
 
 # --- NAVEGACIÓN Y AUTENTICACIÓN ---
 
-params = st.query_params
-
-if "type" in params and params["type"] == "recovery" and "access_token" in params:
-    st.title("🔑 Restablecer Contraseña")
-    st.info("Introduce tu nueva contraseña a continuación.")
-    
-    with st.form("form_recuperacion"):
-        nueva_pw = st.text_input("Nueva Contraseña", type="password")
-        confirmar_pw = st.text_input("Confirmar Nueva Contraseña", type="password")
-        submit_recuperar = st.form_submit_button("Actualizar y Entrar")
-        
-        if submit_recuperar:
-            if nueva_pw == confirmar_pw and len(nueva_pw) >= 6:
-                try:
-                    # 1. Autenticamos manualmente la sesión usando los tokens de la URL
-                    supabase.auth.set_session(params["access_token"], params["refresh_token"])
-                    
-                    # 2. Con la sesión activa, cambiamos la contraseña
-                    supabase.auth.update_user({"password": nueva_pw})
-                    
-                    # 3. Cerramos sesión y limpiamos la URL para forzar un login limpio
-                    supabase.auth.sign_out()
-                    st.query_params.clear()
-                    
-                    st.success("¡Contraseña actualizada con éxito!")
-                    st.info("Ya puedes iniciar sesión con tu nueva contraseña desde el menú lateral.")
-                except Exception as e:
-                    st.error(f"Hubo un error al actualizar: {e}")
-            else:
-                st.error("Las contraseñas no coinciden o son muy cortas (mínimo 6 caracteres).")
-    
-    st.stop() # Detenemos la ejecución aquí
-
 if st.session_state.user is None:
     st.title("👋 Panini Hub")
     st.sidebar.title("🔐 Acceso")
+    
+    # Selector de modo
     modo = st.sidebar.radio("¿Qué deseas hacer?", ["Entrar", "Registrarme", "Olvidé mi contraseña"])
+    
     em = st.sidebar.text_input("Email")
-
+    
     if modo == "Entrar":
         pw = st.sidebar.text_input("Contraseña", type="password")
         if st.sidebar.button("Iniciar Sesión", use_container_width=True):
@@ -333,29 +292,55 @@ if st.session_state.user is None:
                     st.rerun()
             except:
                 st.sidebar.error("Credenciales incorrectas")
-                
+
     elif modo == "Registrarme":
+        # Aquí agregamos los dos campos que pediste para validar la contraseña al crear cuenta
         pw = st.sidebar.text_input("Contraseña", type="password")
+        pw_confirm = st.sidebar.text_input("Confirmar Contraseña", type="password")
+        
         if st.sidebar.button("Crear Cuenta", use_container_width=True):
-            try:
-                res = supabase.auth.sign_up({"email": em, "password": pw})
-                if res.user:
-                    st.session_state.user = res.user
-                    st.sidebar.success("¡Cuenta creada!")
-                    st.rerun()
-            except:
-                st.sidebar.error("Error al registrar (quizás el usuario ya existe)")
-                
+            if pw == pw_confirm:
+                if len(pw) >= 6:
+                    try:
+                        res = supabase.auth.sign_up({"email": em, "password": pw})
+                        if res.user:
+                            st.session_state.user = res.user
+                            st.sidebar.success("¡Cuenta creada!")
+                            st.rerun()
+                    except:
+                        st.sidebar.error("Error al registrar (quizás el usuario ya existe)")
+                else:
+                    st.sidebar.error("La contraseña debe tener al menos 6 caracteres.")
+            else:
+                st.sidebar.error("Las contraseñas no coinciden.")
+
     elif modo == "Olvidé mi contraseña":
-        st.sidebar.info("Te enviaremos un correo para que elijas una nueva clave.")
-        if st.sidebar.button("Enviar correo", use_container_width=True):
+        st.sidebar.info("Te enviaremos un correo con un enlace a tu página de recuperación en GitHub.")
+        if st.sidebar.button("Enviar correo de recuperación", use_container_width=True):
             if em:
                 try:
-                    # Nota: Cambié Localhost a minúscula por convención de URLs
-                    url_actual = st.secrets.get("URL_PROD", "http://localhost:8501")
-                    supabase.auth.reset_password_for_email(em, {"redirect_to": url_actual})
+                    # 👇 REEMPLAZA ESTO CON TU URL DE GITHUB PAGES
+                    url_github = "https://tu-usuario.github.io/recuperacion-panini/" 
+                    
+                    supabase.auth.reset_password_for_email(em, {"redirect_to": url_github})
                     st.sidebar.success(f"Correo enviado a {em}")
+                    st.sidebar.write("Revisa tu bandeja de entrada y sigue las instrucciones.")
                 except Exception as e:
                     st.sidebar.error(f"Error al enviar: {e}")
             else:
-                st.sidebar.warning("Por favor ingresa tu email primero")
+                st.sidebar.warning("Por favor, ingresa tu email primero.")
+
+else:
+    # --- MENÚ PRINCIPAL (Cuando ya inició sesión) ---
+    st.sidebar.write(f"👤 {st.session_state.user.email}")
+    if st.sidebar.button("Cerrar Sesión"):
+        callback_logout()
+        
+    menu = st.sidebar.selectbox("Navegación", ["Estadísticas", "Intercambios", "Exportar"])
+    
+    if menu == "Estadísticas":
+        mostrar_resumen()
+    elif menu == "Intercambios":
+        vista_intercambios()
+    elif menu == "Exportar":
+        mostrar_exportar()
