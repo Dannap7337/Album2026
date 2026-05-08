@@ -1,13 +1,25 @@
 import streamlit as st
-from supabase import create_client, Client, ClientOptions
+import streamlit.components.v1 as components
+from supabase import create_client, Client
 import pandas as pd
 import plotly.express as px
 import io
 
+components.html(
+    """
+    <script>
+    if (window.parent.location.hash && window.parent.location.hash.includes("access_token")) {
+        var new_url = window.parent.location.href.replace('#', '?');
+        window.parent.location.replace(new_url);
+    }
+    </script>
+    """,
+    height=0, width=0
+)
 # 1. CONEXIÓN A SUPABASE
 url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
-supabase: Client = create_client(url, key, options=ClientOptions(flow_type="pkce"))
+supabase: Client = create_client(url, key)
 
 # --- INICIALIZACIÓN DE ESTADO ---
 if 'user' not in st.session_state:
@@ -275,31 +287,39 @@ def login_usuario(em, pw):
 # 1. Verificar si el usuario viene regresando de un correo de recuperación
 params = st.query_params
 
-if "code" in params:
-    try:
-        supabase.auth.exchange_code_for_session(params["code"])
-        st.title ("🔑 Restablecer Contraseña")
-        st.info("Introduce tu nueva contraseña a continuación")
+# Verificamos si los parámetros extraídos por el truco están presentes
+if "type" in params and params["type"] == "recovery" and "access_token" in params:
+    st.title("🔑 Restablecer Contraseña")
+    st.info("Introduce tu nueva contraseña a continuación.")
+    
+    with st.form("form_recuperacion"):
+        nueva_pw = st.text_input("Nueva Contraseña", type="password")
+        confirmar_pw = st.text_input("Confirmar Nueva Contraseña", type="password")
+        submit_recuperar = st.form_submit_button("Actualizar y Entrar")
+        
+        if submit_recuperar:
+            if nueva_pw == confirmar_pw and len(nueva_pw) >= 6:
+                try:
+                    # 1. Autenticamos manualmente la sesión usando los tokens de la URL
+                    supabase.auth.set_session(params["access_token"], params["refresh_token"])
+                    
+                    # 2. Con la sesión activa, cambiamos la contraseña
+                    supabase.auth.update_user({"password": nueva_pw})
+                    
+                    # 3. Cerramos sesión y limpiamos la URL para forzar un login limpio
+                    supabase.auth.sign_out()
+                    st.query_params.clear()
+                    
+                    st.success("¡Contraseña actualizada con éxito!")
+                    st.info("Ya puedes iniciar sesión con tu nueva contraseña desde el menú lateral.")
+                except Exception as e:
+                    st.error(f"Hubo un error al actualizar: {e}")
+            else:
+                st.error("Las contraseñas no coinciden o son muy cortas (mínimo 6 caracteres).")
+    
+    st.stop() # Detenemos la ejecución aquí
 
-        with st.form("form_recuperacion"):
-            nueva_pw = st.text_input("Nueva Contraseña", type="password")
-            confirmar_pw = st.text_input("Confirmar Nueva Contraseña", type="password")
-            submit_recuperar = st.form_submit_button("Actualizar Contraseña")
-
-            if submit_recuperar:
-                if nueva_pw == confirmar_pw and len(nueva_pw) >= 6:
-                    try:
-                        supabase.auth.update_user({"password": nueva_pw})
-                        supabase.auth.sign_out()
-                        st.query_params.clear
-
-                        st.success("¡Contraseña actualizada con éxito!")
-                        st.info("Ya puedes actualizar tu contraseña en el menú lateral.")
-                    except Exception as e:
-                        st.error(f"Hubo un error al actualizar la contraseña: {e}")
-                else:
-                    st.error("Las contraseñas no coinciden o son muy cortas (mínimo 6 caracteres)")
-        st.stop()
+    
     except Exception as e:
         st.error("El enlace de recuperación es inválido, ya fue usado o ha expirado.")
         if st.button("Volver al inicio"):
