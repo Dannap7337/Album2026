@@ -284,10 +284,8 @@ def login_usuario(em, pw):
 
 # --- NAVEGACIÓN Y AUTENTICACIÓN ---
 
-# 1. Verificar si el usuario viene regresando de un correo de recuperación
 params = st.query_params
 
-# Verificamos si los parámetros extraídos por el truco están presentes
 if "type" in params and params["type"] == "recovery" and "access_token" in params:
     st.title("🔑 Restablecer Contraseña")
     st.info("Introduce tu nueva contraseña a continuación.")
@@ -318,12 +316,6 @@ if "type" in params and params["type"] == "recovery" and "access_token" in param
                 st.error("Las contraseñas no coinciden o son muy cortas (mínimo 6 caracteres).")
     
     st.stop() # Detenemos la ejecución aquí
-    except Exception as e:
-        st.error("El enlace de recuperación es inválido, ya fue usado o ha expirado.")
-        if st.button("Volver al inicio"):
-            st.query_params.clear()
-            st.rerun()
-        st.stop()
 
 if st.session_state.user is None:
     st.title("👋 Panini Hub")
@@ -340,7 +332,8 @@ if st.session_state.user is None:
                     st.session_state.user = res.user
                     st.rerun()
             except:
-                st.sidebar.error("Credenciales incorrrectas")
+                st.sidebar.error("Credenciales incorrectas")
+                
     elif modo == "Registrarme":
         pw = st.sidebar.text_input("Contraseña", type="password")
         if st.sidebar.button("Crear Cuenta", use_container_width=True):
@@ -352,16 +345,17 @@ if st.session_state.user is None:
                     st.rerun()
             except:
                 st.sidebar.error("Error al registrar (quizás el usuario ya existe)")
-                    
+                
     elif modo == "Olvidé mi contraseña":
-        st.sidebar.info("Te enviaremos un correo para que eligas una nueva clave.")
+        st.sidebar.info("Te enviaremos un correo para que elijas una nueva clave.")
         if st.sidebar.button("Enviar correo", use_container_width=True):
             if em:
                 try:
-                    url_actual = st.secrets.get("URL_PROD", "http://Localhost:8501")
+                    # Nota: Cambié Localhost a minúscula por convención de URLs
+                    url_actual = st.secrets.get("URL_PROD", "http://localhost:8501")
                     supabase.auth.reset_password_for_email(em, {"redirect_to": url_actual})
                     st.sidebar.success(f"Correo enviado a {em}")
                 except Exception as e:
                     st.sidebar.error(f"Error al enviar: {e}")
             else:
-                    st.sidebar.warning("Por favor ingresa tu email primero")
+                st.sidebar.warning("Por favor ingresa tu email primero")
