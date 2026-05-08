@@ -271,31 +271,87 @@ def login_usuario(em, pw):
         st.error(f"Error de inicio de sesión: Verifique sus credenciales")
 
 # --- NAVEGACIÓN ---
+# --- NAVEGACIÓN Y AUTENTICACIÓN ---
+
+# 1. Verificar si el usuario viene regresando de un correo de recuperación
+params = st.query_params
+if "type" in params and params["type"] == "recovery":
+    st.title("🔑 Restablecer Contraseña")
+    st.info("Introduce tu nueva contraseña a continuación.")
+    
+    with st.form("form_recuperacion"):
+        nueva_pw = st.text_input("Nueva Contraseña", type="password")
+        confirmar_pw = st.text_input("Confirmar Nueva Contraseña", type="password")
+        submit_recuperar = st.form_submit_button("Actualizar y Entrar")
+        
+        if submit_recuperar:
+            if nueva_pw == confirmar_pw and len(nueva_pw) >= 6:
+                try:
+                    supabase.auth.update_user({"password": nueva_pw})
+                    st.success("¡Contraseña actualizada con éxito!")
+                    # Limpiamos los parámetros para que no vuelva a entrar aquí
+                    st.query_params.clear()
+                    st.info("Ya puedes iniciar sesión con tu nueva contraseña desde el menú lateral.")
+                except Exception as e:
+                    st.error(f"Hubo un error: {e}")
+            else:
+                st.error("Las contraseñas no coinciden o son muy cortas (mínimo 6 caracteres).")
+    st.stop() # Detenemos la ejecución aquí para que no cargue nada más
+
+# 2. Lógica de Login / Registro / Solicitud de Recuperación
 if st.session_state.user is None:
     st.title("👋 Panini Hub")
     st.sidebar.title("🔐 Acceso")
-    em = st.sidebar.text_input("Email")
-    pw = st.sidebar.text_input("Pass", type="password")
     
-    col1, col2 = st.sidebar.columns(2)
-    if col1.button("Entrar"):
-        login_usuario(em, pw)
-        
-    if col2.button("Registrar"):
-        try:
-            res = supabase.auth.sign_up({"email": em, "password": pw})
-            if res.user:
-                st.session_state.user = res.user
-                st.success("Cuenta creada")
-                st.rerun()
-        except:
-            st.error("Error al registrar")
+    # Selector para cambiar entre modos
+    modo = st.sidebar.radio("¿Qué deseas hacer?", ["Entrar", "Registrarme", "Olvidé mi contraseña"])
+    
+    em = st.sidebar.text_input("Email")
+    
+    if modo == "Entrar":
+        pw = st.sidebar.text_input("Contraseña", type="password")
+        if st.sidebar.button("Iniciar Sesión", use_container_width=True):
+            try:
+                res = supabase.auth.sign_in_with_password({"email": em, "password": pw})
+                if res.user:
+                    st.session_state.user = res.user
+                    st.rerun()
+            except:
+                st.sidebar.error("Credenciales incorrectas")
 
+    elif modo == "Registrarme":
+        pw = st.sidebar.text_input("Contraseña", type="password")
+        if st.sidebar.button("Crear Cuenta", use_container_width=True):
+            try:
+                res = supabase.auth.sign_up({"email": em, "password": pw})
+                if res.user:
+                    st.session_state.user = res.user
+                    st.sidebar.success("¡Cuenta creada!")
+                    st.rerun()
+            except:
+                st.sidebar.error("Error al registrar (quizás el usuario ya existe)")
+
+elif modo == "Olvidé mi contraseña":
+        st.sidebar.info("Te enviaremos un correo para que elijas una nueva clave.")
+        if st.sidebar.button("Enviar correo", use_container_width=True):
+            try:
+                # Detecta automáticamente si estás en local o en la nube
+                # Si no funciona, pon la URL de tu app directamente entre comillas
+                url_actual = st.secrets.get("URL_PROD", "http://localhost:8501")
+                
+                supabase.auth.reset_password_for_email(em, {"redirect_to": url_actual})
+                st.sidebar.success(f"Correo enviado a {em}")
+            except Exception as e:
+                st.sidebar.error("Error al enviar el correo")
 else:
+    # --- MENÚ PARA USUARIO AUTENTICADO ---
     st.sidebar.write(f"👤 {st.session_state.user.email}")
     st.sidebar.button("Cerrar Sesión", on_click=callback_logout)
+    
     menu = st.sidebar.radio("Menú", ["🏠 Resumen", "🚩 Selecciones", "🤝 Intercambios", "📥 Exportar", "⚙️ Ajustes"])
-    if menu == "🏠 Resumen": mostrar_resumen()
+    
+    if menu == "🏠 Resumen": 
+        mostrar_resumen()
     elif menu == "🚩 Selecciones":
         sigla = st.sidebar.selectbox("Equipo", ORDEN_SELECCIONES)
         res = supabase.table("user_stickers").select("*").eq("user_id", st.session_state.user.id).eq("team_code", sigla).execute()
@@ -310,11 +366,17 @@ else:
                 c1, c2 = st.columns(2)
                 if c1.button("➖", key=f"m_{c}"): actualizar_db([c], "restar"); st.rerun()
                 if c2.button("➕", key=f"p_{c}"): actualizar_db([c], "sumar"); st.rerun()
-    elif menu == "🤝 Intercambios": vista_intercambios()
-    elif menu == "📥 Exportar": mostrar_exportar()
+    elif menu == "🤝 Intercambios": 
+        vista_intercambios()
+    elif menu == "📥 Exportar": 
+        mostrar_exportar()
     else:
         st.title("⚙️ Ajustes")
         with st.form("p"):
             n = st.text_input("Nueva Contraseña", type="password")
-            if st.form_submit_button("Actualizar"): supabase.auth.update_user({"password": n}); st.success("OK")
-        if st.button("Borrar Datos"): supabase.table("user_stickers").delete().eq("user_id", st.session_state.user.id).execute(); st.rerun()
+            if st.form_submit_button("Actualizar"): 
+                supabase.auth.update_user({"password": n})
+                st.success("OK")
+        if st.button("Borrar Datos"): 
+            supabase.table("user_stickers").delete().eq("user_id", st.session_state.user.id).execute()
+            st.rerun()
