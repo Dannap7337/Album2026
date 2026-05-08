@@ -1,5 +1,5 @@
 import streamlit as st
-from supabase import create_client, Client
+from supabase import create_client, Client, ClientOptions
 import pandas as pd
 import plotly.express as px
 import io
@@ -7,7 +7,7 @@ import io
 # 1. CONEXIÓN A SUPABASE
 url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
-supabase: Client = create_client(url, key)
+supabase: Client = create_client(url, key, options=ClientOptions(flow_type="pkce"))
 
 # --- INICIALIZACIÓN DE ESTADO ---
 if 'user' not in st.session_state:
