@@ -318,8 +318,6 @@ if "type" in params and params["type"] == "recovery" and "access_token" in param
                 st.error("Las contraseñas no coinciden o son muy cortas (mínimo 6 caracteres).")
     
     st.stop() # Detenemos la ejecución aquí
-
-    
     except Exception as e:
         st.error("El enlace de recuperación es inválido, ya fue usado o ha expirado.")
         if st.button("Volver al inicio"):
