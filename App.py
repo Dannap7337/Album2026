@@ -270,44 +270,49 @@ def login_usuario(em, pw):
     except Exception as e:
         st.error(f"Error de inicio de sesión: Verifique sus credenciales")
 
-# --- NAVEGACIÓN ---
 # --- NAVEGACIÓN Y AUTENTICACIÓN ---
 
 # 1. Verificar si el usuario viene regresando de un correo de recuperación
 params = st.query_params
-if "type" in params and params["type"] == "recovery":
-    st.title("🔑 Restablecer Contraseña")
-    st.info("Introduce tu nueva contraseña a continuación.")
-    
-    with st.form("form_recuperacion"):
-        nueva_pw = st.text_input("Nueva Contraseña", type="password")
-        confirmar_pw = st.text_input("Confirmar Nueva Contraseña", type="password")
-        submit_recuperar = st.form_submit_button("Actualizar y Entrar")
-        
-        if submit_recuperar:
-            if nueva_pw == confirmar_pw and len(nueva_pw) >= 6:
-                try:
-                    supabase.auth.update_user({"password": nueva_pw})
-                    st.success("¡Contraseña actualizada con éxito!")
-                    # Limpiamos los parámetros para que no vuelva a entrar aquí
-                    st.query_params.clear()
-                    st.info("Ya puedes iniciar sesión con tu nueva contraseña desde el menú lateral.")
-                except Exception as e:
-                    st.error(f"Hubo un error: {e}")
-            else:
-                st.error("Las contraseñas no coinciden o son muy cortas (mínimo 6 caracteres).")
-    st.stop() # Detenemos la ejecución aquí para que no cargue nada más
 
-# 2. Lógica de Login / Registro / Solicitud de Recuperación
+if "code" in params:
+    try:
+        supabase.auth.exchange_code_for_session(params["code"])
+        st.title ("🔑 Restablecer Contraseña")
+        st.info("Introduce tu nueva contraseña a continuación")
+
+        with st.form("form_recuperacion"):
+            nueva_pw = st.text_input("Nueva Contraseña", type="password")
+            confirmar_pw = st.text_input("Confirmar Nueva Contraseña", type="password")
+            submit_recuperar = st.form_submit_button("Actualizar Contraseña")
+
+            if submit_recuperar:
+                if nueva_pw == confirmar_pw and len(nueva_pw) >= 6:
+                    try:
+                        supabase.auth.update_user({"password": nueva_pw})
+                        supabase.auth.sign_out()
+                        st.query_params.clear
+
+                        st.success("¡Contraseña actualizada con éxito!")
+                        st.info("Ya puedes actualizar tu contraseña en el menú lateral.")
+                    except Exception as e:
+                        st.error(f"Hubo un error al actualizar la contraseña: {e}")
+                else:
+                    st.error("Las contraseñas no coinciden o son muy cortas (mínimo 6 caracteres)")
+        st.stop()
+    except Exception as e:
+        st.error("El enlace de recuperación es inválido, ya fue usado o ha expirado.")
+        if st.button("Volver al inicio"):
+            st.query_params.clear()
+            st.rerun()
+        st.stop()
+
 if st.session_state.user is None:
     st.title("👋 Panini Hub")
     st.sidebar.title("🔐 Acceso")
-    
-    # Selector para cambiar entre modos
     modo = st.sidebar.radio("¿Qué deseas hacer?", ["Entrar", "Registrarme", "Olvidé mi contraseña"])
-    
     em = st.sidebar.text_input("Email")
-    
+
     if modo == "Entrar":
         pw = st.sidebar.text_input("Contraseña", type="password")
         if st.sidebar.button("Iniciar Sesión", use_container_width=True):
@@ -317,30 +322,28 @@ if st.session_state.user is None:
                     st.session_state.user = res.user
                     st.rerun()
             except:
-                st.sidebar.error("Credenciales incorrectas")
-
-    elif modo == "Registrarme":
-        pw = st.sidebar.text_input("Contraseña", type="password")
-        if st.sidebar.button("Crear Cuenta", use_container_width=True):
-            try:
-                res = supabase.auth.sign_up({"email": em, "password": pw})
-                if res.user:
-                    st.session_state.user = res.user
-                    st.sidebar.success("¡Cuenta creada!")
-                    st.rerun()
-            except:
-                st.sidebar.error("Error al registrar (quizás el usuario ya existe)")
-
-    elif modo == "Olvidé mi contraseña":
-        st.sidebar.info("Te enviaremos un correo para que elijas una nueva clave.")
-        if st.sidebar.button("Enviar correo", use_container_width=True):
-            if em:
+                st.sidebar.error("Credenciales incorrrectas")
+        elif modo == "Registrarme":
+            pw = st.sidebar.text_input("Contraseña", type="password")
+            if st.sidebar.button("Crear Cuenta", use_container_width=True):
                 try:
-                    # Intenta obtener la URL de secrets, si no usa la local
-                    url_actual = st.secrets.get("URL_PROD", "http://localhost:8501")
-                    supabase.auth.reset_password_for_email(em, {"redirect_to": url_actual})
-                    st.sidebar.success(f"Correo enviado a {em}")
-                except Exception as e:
-                    st.sidebar.error(f"Error al enviar: {e}")
-            else:
-                st.sidebar.warning("Por favor, ingresa tu email primero.")
+                    res = supabase.auth.sign_up({"email": em, "password": pw})
+                    if res.user:
+                        st.session_state.user = res.user
+                        st.sidebar.success("¡Cuenta creada!")
+                        st.rerun()
+                except:
+                    st.sidebar.error("Error al registrar (quizás el usuario ya existe)")
+                    
+        elif modo == "Olvidé mi contraseña":
+            st.sidebar.info("Te enviaremos un correo para que eligas una nueva clave.")
+            if st.sidebar.button("Enviar correo", use_container_width=True):
+                if em:
+                    try:
+                        url_actual = st.secrets.get("URL_PROD", "http://Localhost:8501")
+                        supabase.auth.reset_password_for_email(em, {"redirect_to": url_actual})
+                        st.sidebar.success(f"Correo enviado a {em}")
+                    except Exception as e:
+                        st.sidebar.error(f"Error al enviar: {e}")
+                else:
+                    st.sidebar.warning("Por favor ingresa tu email primero")
