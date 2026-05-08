@@ -331,52 +331,16 @@ if st.session_state.user is None:
             except:
                 st.sidebar.error("Error al registrar (quizás el usuario ya existe)")
 
-elif modo == "Olvidé mi contraseña":
+    elif modo == "Olvidé mi contraseña":
         st.sidebar.info("Te enviaremos un correo para que elijas una nueva clave.")
         if st.sidebar.button("Enviar correo", use_container_width=True):
-            try:
-                # Detecta automáticamente si estás en local o en la nube
-                # Si no funciona, pon la URL de tu app directamente entre comillas
-                url_actual = st.secrets.get("URL_PROD", "http://localhost:8501")
-                
-                supabase.auth.reset_password_for_email(em, {"redirect_to": url_actual})
-                st.sidebar.success(f"Correo enviado a {em}")
-            except Exception as e:
-                st.sidebar.error("Error al enviar el correo")
-else:
-    # --- MENÚ PARA USUARIO AUTENTICADO ---
-    st.sidebar.write(f"👤 {st.session_state.user.email}")
-    st.sidebar.button("Cerrar Sesión", on_click=callback_logout)
-    
-    menu = st.sidebar.radio("Menú", ["🏠 Resumen", "🚩 Selecciones", "🤝 Intercambios", "📥 Exportar", "⚙️ Ajustes"])
-    
-    if menu == "🏠 Resumen": 
-        mostrar_resumen()
-    elif menu == "🚩 Selecciones":
-        sigla = st.sidebar.selectbox("Equipo", ORDEN_SELECCIONES)
-        res = supabase.table("user_stickers").select("*").eq("user_id", st.session_state.user.id).eq("team_code", sigla).execute()
-        inv = {item['sticker_code']: item['quantity'] for item in res.data}
-        cods = (['00'] + [f'FWC{i}' for i in range(1, 20)] if sigla == 'FWC' else ([f'CC{i}' for i in range(1, 15)] if sigla == 'CC' else [f'{sigla}{i}' for i in range(1, 21)]))
-        cols = st.columns(4)
-        for i, c in enumerate(cods):
-            cant = inv.get(c, 0)
-            color = COLORS["Falta"] if cant == 0 else (COLORS["Tengo"] if cant == 1 else COLORS["Repetida"])
-            with cols[i % 4]:
-                st.markdown(f'<div style="border:3px solid {color}; border-radius:10px; padding:10px; text-align:center;"><h3>{c}</h3><p>Cant: {cant}</p></div>', unsafe_allow_html=True)
-                c1, c2 = st.columns(2)
-                if c1.button("➖", key=f"m_{c}"): actualizar_db([c], "restar"); st.rerun()
-                if c2.button("➕", key=f"p_{c}"): actualizar_db([c], "sumar"); st.rerun()
-    elif menu == "🤝 Intercambios": 
-        vista_intercambios()
-    elif menu == "📥 Exportar": 
-        mostrar_exportar()
-    else:
-        st.title("⚙️ Ajustes")
-        with st.form("p"):
-            n = st.text_input("Nueva Contraseña", type="password")
-            if st.form_submit_button("Actualizar"): 
-                supabase.auth.update_user({"password": n})
-                st.success("OK")
-        if st.button("Borrar Datos"): 
-            supabase.table("user_stickers").delete().eq("user_id", st.session_state.user.id).execute()
-            st.rerun()
+            if em:
+                try:
+                    # Intenta obtener la URL de secrets, si no usa la local
+                    url_actual = st.secrets.get("URL_PROD", "http://localhost:8501")
+                    supabase.auth.reset_password_for_email(em, {"redirect_to": url_actual})
+                    st.sidebar.success(f"Correo enviado a {em}")
+                except Exception as e:
+                    st.sidebar.error(f"Error al enviar: {e}")
+            else:
+                st.sidebar.warning("Por favor, ingresa tu email primero.")
