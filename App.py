@@ -319,8 +319,7 @@ if st.session_state.user is None:
         if st.sidebar.button("Enviar correo de recuperación", use_container_width=True):
             if em:
                 try:
-                    # 👇 REEMPLAZA ESTO CON TU URL DE GITHUB PAGES
-                    url_github = "https://tu-usuario.github.io/recuperacion-panini/" 
+                    url_github = "https://dannap7337.github.io/recuperacion-panini/" 
                     
                     supabase.auth.reset_password_for_email(em, {"redirect_to": url_github})
                     st.sidebar.success(f"Correo enviado a {em}")
