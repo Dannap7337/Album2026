@@ -271,75 +271,116 @@ def login_usuario(em, pw):
     except Exception as e:
         st.error(f"Error de inicio de sesión: Verifique sus credenciales")
 
-# --- NAVEGACIÓN Y AUTENTICACIÓN ---
+import streamlit as st
 
+# --- LÓGICA DE LOGIN / REGISTRO ---
 if st.session_state.user is None:
     st.title("👋 Panini Hub")
     st.sidebar.title("🔐 Acceso")
     
-    # Selector de modo
-    modo = st.sidebar.radio("¿Qué deseas hacer?", ["Entrar", "Registrarme", "Olvidé mi contraseña"])
+    modo = st.sidebar.radio("¿Qué deseas hacer?", ["Entrar", "Registrarme"])
     
     em = st.sidebar.text_input("Email")
+    pw = st.sidebar.text_input("Contraseña", type="password")
     
     if modo == "Entrar":
-        pw = st.sidebar.text_input("Contraseña", type="password")
         if st.sidebar.button("Iniciar Sesión", use_container_width=True):
             try:
                 res = supabase.auth.sign_in_with_password({"email": em, "password": pw})
                 if res.user:
                     st.session_state.user = res.user
                     st.rerun()
-            except:
+            except Exception as e:
                 st.sidebar.error("Credenciales incorrectas")
-
-    elif modo == "Registrarme":
-        # Aquí agregamos los dos campos que pediste para validar la contraseña al crear cuenta
-        pw = st.sidebar.text_input("Contraseña", type="password")
-        pw_confirm = st.sidebar.text_input("Confirmar Contraseña", type="password")
         
-        if st.sidebar.button("Crear Cuenta", use_container_width=True):
-            if pw == pw_confirm:
-                if len(pw) >= 6:
-                    try:
-                        res = supabase.auth.sign_up({"email": em, "password": pw})
-                        if res.user:
-                            st.session_state.user = res.user
-                            st.sidebar.success("¡Cuenta creada!")
-                            st.rerun()
-                    except:
-                        st.sidebar.error("Error al registrar (quizás el usuario ya existe)")
-                else:
-                    st.sidebar.error("La contraseña debe tener al menos 6 caracteres.")
-            else:
-                st.sidebar.error("Las contraseñas no coinciden.")
-
-    elif modo == "Olvidé mi contraseña":
-        st.sidebar.info("Te enviaremos un correo con un enlace a tu página de recuperación en GitHub.")
-        if st.sidebar.button("Enviar correo de recuperación", use_container_width=True):
+        # Opción para recuperar contraseña (el link que arreglamos en GitHub)
+        if st.sidebar.button("¿Olvidaste tu contraseña?"):
             if em:
                 try:
-                    url_github = "https://dannap7337.github.io/recuperacion-panini/" 
-                    
+                    # Asegúrate de que esta URL sea la de tu index.html en GitHub
+                    url_github = "https://tu-usuario.github.io/recuperacion-panini/"
                     supabase.auth.reset_password_for_email(em, {"redirect_to": url_github})
-                    st.sidebar.success(f"Correo enviado a {em}")
-                    st.sidebar.write("Revisa tu bandeja de entrada y sigue las instrucciones.")
+                    st.sidebar.success("Correo de recuperación enviado.")
                 except Exception as e:
-                    st.sidebar.error(f"Error al enviar: {e}")
+                    st.sidebar.error("Error al enviar correo")
             else:
-                st.sidebar.warning("Por favor, ingresa tu email primero.")
+                st.sidebar.warning("Escribe tu email primero")
+
+    elif modo == "Registrarme":
+        if st.sidebar.button("Crear Cuenta", use_container_width=True):
+            try:
+                res = supabase.auth.sign_up({"email": em, "password": pw})
+                if res.user:
+                    st.session_state.user = res.user
+                    st.sidebar.success("¡Cuenta creada exitosamente!")
+                    st.rerun()
+            except Exception as e:
+                st.sidebar.error("Error al registrar")
 
 else:
-    # --- MENÚ PRINCIPAL (Cuando ya inició sesión) ---
+    # --- MENÚ PARA USUARIO AUTENTICADO ---
     st.sidebar.write(f"👤 {st.session_state.user.email}")
     if st.sidebar.button("Cerrar Sesión"):
-        callback_logout()
-        
-    menu = st.sidebar.selectbox("Navegación", ["Estadísticas", "Intercambios", "Exportar"])
+        callback_logout() # Asegúrate de tener definida esta función para limpiar el state
     
-    if menu == "Estadísticas":
+    menu = st.sidebar.radio("Menú", ["🏠 Resumen", "🚩 Selecciones", "🤝 Intercambios", "📥 Exportar", "⚙️ Ajustes"])
+    
+    if menu == "🏠 Resumen": 
         mostrar_resumen()
-    elif menu == "Intercambios":
+        
+    elif menu == "🚩 Selecciones":
+        # ORDEN_SELECCIONES debe estar definido previamente en tu código
+        sigla = st.sidebar.selectbox("Equipo", ORDEN_SELECCIONES)
+        
+        # Consultar inventario del usuario para este equipo
+        res = supabase.table("user_stickers").select("*").eq("user_id", st.session_state.user.id).eq("team_code", sigla).execute()
+        inv = {item['sticker_code']: item['quantity'] for item in res.data}
+        
+        # Generar códigos de estampas (FWC, CC o Selecciones normales)
+        if sigla == 'FWC':
+            cods = ['00'] + [f'FWC{i}' for i in range(1, 20)]
+        elif sigla == 'CC':
+            cods = [f'CC{i}' for i in range(1, 15)]
+        else:
+            cods = [f'{sigla}{i}' for i in range(1, 21)]
+            
+        st.title(f"🚩 Selección: {sigla}")
+        
+        # Mostrar estampas en cuadrícula de 4 columnas
+        cols = st.columns(4)
+        for i, c in enumerate(cods):
+            cant = inv.get(c, 0)
+            
+            # Aplicar colores según cantidad (Tengo, Falta, Repetida)
+            # COLORS debe estar definido: {"Falta": "#FF4B4B", "Tengo": "#28A745", "Repetida": "#FFD700"}
+            color = COLORS["Falta"] if cant == 0 else (COLORS["Tengo"] if cant == 1 else COLORS["Repetida"])
+            
+            with cols[i % 4]:
+                st.markdown(f'''
+                    <div style="border:3px solid {color}; border-radius:10px; padding:10px; text-align:center; margin-bottom:10px;">
+                        <h3 style="margin:0;">{c}</h3>
+                        <p style="margin:0; font-size:14px;">Cant: {cant}</p>
+                    </div>
+                ''', unsafe_allow_html=True)
+                
+                c1, c2 = st.columns(2)
+                if c1.button("➖", key=f"m_{c}"): 
+                    actualizar_db(c, "restar") # Ajusté para pasar solo el código c
+                    st.rerun()
+                if c2.button("➕", key=f"p_{c}"): 
+                    actualizar_db(c, "sumar")
+                    st.rerun()
+                
+    elif menu == "🤝 Intercambios": 
         vista_intercambios()
-    elif menu == "Exportar":
+        
+    elif menu == "📥 Exportar": 
         mostrar_exportar()
+        
+    else:
+        st.title("⚙️ Ajustes")
+        st.warning("⚠️ Zona de Peligro")
+        if st.button("Borrar Todas Mis Estampas", type="primary"): 
+            supabase.table("user_stickers").delete().eq("user_id", st.session_state.user.id).execute()
+            st.success("Tu álbum ha sido reiniciado.")
+            st.rerun()
