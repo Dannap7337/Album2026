@@ -116,6 +116,26 @@ def mostrar_resumen():
     c2.metric("Estampas Pegadas", cant_tengo)
     c3.metric("Faltantes", total_album - cant_tengo)
     c4.metric("Selecciones Completas", f"{completadas}/{len(CONFIG_ALBUM)}")
+
+    col_chart, col_info = st.columns([2, 1])
+
+    with col_chart:
+        fig_total = px.pie(
+            names=["Completado", "Restante"],
+            hole=0.6,
+            color_discrete_secuence=[COLORS["Tengo"], COLORS["Falta"]],
+            title="Estado del Álbum"
+        )
+        fig_total.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=350)
+        st.plotly_chart(fig_total, use_container_width=True)
+
+    with col_info:
+        st.write('### Resumen')
+        st.write(f"Llevas **{cant_tengo}** estampas de un total de **{total_album}**")
+        if cant_tengo == total_album:
+            st.success("¡Felicidades! Álbum completo 🏆")
+        else:
+            st.info(f"¡Solo te faltan **{total_album - cant_tengo}**!")
     
     st.divider()
     modo = st.radio("Analizar por:", ["Grupos", "Selección Específica"], horizontal=True)
