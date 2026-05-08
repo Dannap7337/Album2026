@@ -116,19 +116,6 @@ def mostrar_resumen():
     c2.metric("Estampas Pegadas", cant_tengo)
     c3.metric("Faltantes", total_album - cant_tengo)
     c4.metric("Selecciones Completas", f"{completadas}/{len(CONFIG_ALBUM)}")
-
-    col_chart, _ = st.columns([2, 1])
-
-    with col_chart:
-        fig_gen = px.pie(
-            names=["Tengo", "Faltan"],
-            values=[cant_tengo, total_album - cant_tengo],
-            hole=0.5,
-            color_discrete_seguence[COLORS["Tengo"], COLORS["Falta"]],
-            title="Avance Global del Álbum 🌎"
-        )
-        fig_gen.update_layout(height=400, margin= dict(t=50, b=20, l=0, r=0))
-        st.plotly_chart(fig_gen, use_container_width=True)
     
     st.divider()
     modo = st.radio("Analizar por:", ["Grupos", "Selección Específica"], horizontal=True)
