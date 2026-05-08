@@ -298,7 +298,7 @@ if st.session_state.user is None:
             if em:
                 try:
                     # Asegúrate de que esta URL sea la de tu index.html en GitHub
-                    url_github = "https://tu-usuario.github.io/recuperacion-panini/"
+                    url_github = "https://dannap7337.github.io/recuperacion-panini/"
                     supabase.auth.reset_password_for_email(em, {"redirect_to": url_github})
                     st.sidebar.success("Correo de recuperación enviado.")
                 except Exception as e:
