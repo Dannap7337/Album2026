@@ -365,10 +365,10 @@ else:
                 
                 c1, c2 = st.columns(2)
                 if c1.button("➖", key=f"m_{c}"): 
-                    actualizar_db(c, "restar") # Ajusté para pasar solo el código c
+                    actualizar_db([c], "restar") # Ajusté para pasar solo el código c
                     st.rerun()
                 if c2.button("➕", key=f"p_{c}"): 
-                    actualizar_db(c, "sumar")
+                    actualizar_db([c], "sumar")
                     st.rerun()
                 
     elif menu == "🤝 Intercambios": 
