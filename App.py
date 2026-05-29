@@ -31,18 +31,6 @@ CONFIG_ALBUM = {
     'GHA': 20, 'PAN': 20
 }
 
-BANDERAS_SELECCIONES = {
-    'FWC': '🏆', 'MEX': '🇲🇽', 'RSA': '🇿🇦', 'KOR': '🇰🇷', 'CZE': '🇨🇿', 'CAN': '🇨🇦',
-    'BIH': '🇧🇦', 'QAT': '🇶🇦', 'SUI': '🇨🇭', 'BRA': '🇧🇷', 'MAR': '🇲🇦', 'HAI': '🇭🇹',
-    'SCO': '🏴󠁧󠁢󠁳󠁣󠁴󠁿', 'USA': '🇺🇸', 'PAR': '🇵🇾', 'AUS': '🇦🇺', 'TUR': '🇹🇷', 'GER': '🇩🇪',
-    'CUW': '🇨🇼', 'CIV': '🇨🇮', 'ECU': '🇪🇨', 'NED': '🇳🇱', 'JPN': '🇯🇵', 'SWE': '🇸🇪',
-    'TUN': '🇹🇳', 'CC': '🥤',  'BEL': '🇧🇪', 'EGY': '🇪🇬', 'IRN': '🇮🇷', 'NZL': '🇳🇿',
-    'ESP': '🇪🇸', 'CPV': '🇨🇻', 'KSA': '🇸🇦', 'URU': '🇺🇾', 'FRA': '🇫🇷', 'SEN': '🇸🇳',
-    'IRQ': '🇮🇶', 'NOR': '🇳🇴', 'ARG': '🇦🇷', 'ALG': '🇩🇿', 'AUT': '🇦🇹', 'JOR': '🇯🇴',
-    'POR': '🇵🇹', 'COD': '🇨🇩', 'UZB': '🇺🇿', 'COL': '🇨🇴', 'ENG': '🏴󠁧󠁢󠁥󠁮󠁧󠁿', 'CRO': '🇭🇷',
-    'GHA': '🇬🇭', 'PAN': '🇵🇦'
-}
-
 ORDEN_SELECCIONES = list(CONFIG_ALBUM.keys())
 
 GRUPOS = {
@@ -102,94 +90,80 @@ def generar_tablero_por_grupos(df_origen, es_repetidas=False):
     """
     if df_origen.empty:
         return pd.DataFrame()
-    
+
     # Mapeo inverso: saber a qué grupo pertenece cada Selección
     seleccion_a_grupo = {}
     for grupo, selecciones in GRUPOS.items():
         for sel in selecciones:
             seleccion_a_grupo[sel] = grupo
-            
+
     df = df_origen.copy()
     # Identificar grupo de cada registro
     df['Grupo'] = df['Selección'].apply(lambda x: seleccion_a_grupo.get(x, 'Otros'))
-    
+
     # Ordenar los datos internamente por orden oficial de Panini
     df['sel_idx'] = df['Selección'].apply(lambda x: ORDEN_SELECCIONES.index(x) if x in ORDEN_SELECCIONES else 999)
     df['num_idx'] = df['Código'].apply(obtener_orden_numerico)
     df = df.sort_values(by=['sel_idx', 'num_idx'])
-    
+
     columnas_tablero = {}
     max_filas = 0
-    
+
     # Procesar cada grupo en el orden definido en el diccionario GRUPOS
     for grupo in GRUPOS.keys():
         df_grupo = df[df['Grupo'] == grupo]
         
         if not df_grupo.empty:
-            # Obtener el emoji de la bandera de la selección actual
-            # (Asume que 'Selección' guarda el nombre del país, ej: 'México')
-            def formatear_celda(row):
-                pais = row['Selección']
-                bandera = BANDERAS_SELECCIONES.get(pais, "🏳️") # '🏳️' por si no encuentra el país
-                
-                if es_repetidas:
-                    return f"{bandera} {row['Código']} (x{int(row['Cantidad Extra'])})"
-                else:
-                    return f"{bandera} {row['Código']}"
-
-            # Crear los textos que irán en las celdas con su respectiva bandera
-            valores = df_grupo.apply(formatear_celda, axis=1).tolist()
+            # Crear los textos que irán en las celdas
+            if es_repetidas:
+                # Ejemplo: "ARG5 (x2)"
+                valores = df_grupo.apply(lambda r: f"{r['Código']} (x{int(r['Cantidad Extra'])})", axis=1).tolist()
+            else:
+                # Ejemplo: "MEX3"
+                valores = df_grupo['Código'].tolist()
         else:
             valores = []
-            
-        # Opcional: Si quieres que el ENCABEZADO del grupo también tenga bandera
-        # Puedes buscar si el grupo coincide con algún país, si no, se queda el nombre del grupo solo
-        bandera_grupo = BANDERAS_SELECCIONES.get(grupo, "")
-        nombre_columna = f"{bandera_grupo} {grupo}".strip()
-            
-        columnas_tablero[nombre_columna] = valores
+
+        columnas_tablero[grupo] = valores
         if len(valores) > max_filas:
             max_filas = len(valores)
-            
+
     # Nivelar listas para que todas tengan la misma longitud rellenando con celdas vacías
     tablero_final = pd.DataFrame()
-    for nombre_columna in columnas_tablero.keys():
-        lista_valores = columnas_tablero[nombre_columna]
+    for grupo in GRUPOS.keys():
+        lista_valores = columnas_tablero[grupo]
         # Rellenar con strings vacíos los espacios faltantes
-        # Hacemos una copia para no alterar la lista original en el diccionario
-        lista_valores_rellena = lista_valores + [""] * (max_filas - len(lista_valores))
-        
+        lista_valores += [""] * (max_filas - len(lista_valores))
+
         # Añadir al DataFrame final dejando una columna en blanco de separación decorativa
-        tablero_final[nombre_columna] = lista_valores_rellena
+        tablero_final[grupo] = lista_valores
         tablero_final[f" "] = [""] * max_filas  # Columna separadora
-        
+
     # Eliminar la última columna en blanco sobrante
     if not tablero_final.empty:
-        # Usamos loc para evitar problemas con nombres de columnas duplicados (los espacios en blanco)
         tablero_final = tablero_final.iloc[:, :-1]
-        
-    return tablero_final
 
+    return tablero_final
 
 def preparar_excel(df_faltantes, df_repetidas):
     output = io.BytesIO()
-    
+
     # Generar las estructuras horizontales por grupos
     tablero_faltantes = generar_tablero_por_grupos(df_faltantes, es_repetidas=False)
     tablero_repetidas = generar_tablero_por_grupos(df_repetidas, es_repetidas=True)
-    
+
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         # Pestaña 1: Faltantes
         if not tablero_faltantes.empty:
             tablero_faltantes.to_excel(writer, sheet_name='Faltantes', index=False)
-            
+
             # Estilizar hoja para impresión en una sola página
             ws = writer.sheets['Faltantes']
             configurar_impresion_excel(ws)
         else:
             # Hoja vacía de respaldo si no hay faltantes
             pd.DataFrame([["¡Felicidades! No te faltan estampas."]]).to_excel(writer, sheet_name='Faltantes', index=False, header=False)
-            
+
         # Pestaña 2: Repetidas
         if not tablero_repetidas.empty:
             tablero_repetidas.to_excel(writer, sheet_name='Repetidas', index=False)
@@ -197,13 +171,13 @@ def preparar_excel(df_faltantes, df_repetidas):
             configurar_impresion_excel(ws)
         else:
             pd.DataFrame([["No tienes estampas repetidas."]]).to_excel(writer, sheet_name='Repetidas', index=False, header=False)
-            
+
     return output.getvalue()
 
 def configurar_impresion_excel(ws):
     """Aplica configuraciones nativas de Excel para ajustar el contenido a 1 sola página horizontal"""
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-    
+
     # 1. Ajuste de página para Impresión
     ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE  # Horizontal
     ws.page_setup.paperSize = ws.PAPERSIZE_A4             # O ws.PAPERSIZE_LETTER según prefieras
@@ -213,8 +187,8 @@ def configurar_impresion_excel(ws):
 
     # 2. Estilos Visuales (Encabezados y Cuadrícula pequeña)
     fill_header = PatternFill(start_color="14A8FD", end_color="14A8FD", fill_type="solid")
-    font_header = Font(name="Twemoji Mozilla", size=10, bold=True, color="FFFFFF")
-    font_body = Font(name="Twemoji Mozilla", size=9)
+    font_header = Font(name="Arial", size=10, bold=True, color="FFFFFF")
+    font_body = Font(name="Arial", size=9)
     align_center = Alignment(horizontal="center", vertical="center")
     thin_border = Border(
         left=Side(style='thin', color='DDDDDD'),
@@ -226,18 +200,18 @@ def configurar_impresion_excel(ws):
     # Estilizar filas y columnas
     for col_idx, col in enumerate(ws.columns, start=1):
         header_cell = col[0]
-        
+
         # Detectar si es columna de separación (nombre vacío)
         if header_cell.value is None or str(header_cell.value).strip() == "":
             ws.column_dimensions[header_cell.column_letter].width = 3 # Columna separadora angosta
             continue
-            
+
         # Modificar encabezados de Grupo
         header_cell.fill = fill_header
         header_cell.font = font_header
         header_cell.alignment = align_center
         ws.column_dimensions[header_cell.column_letter].width = 11 # Columnas de datos compactas
-        
+
         # Estilizar las celdas de estampas inferiores
         for cell in col[1:]:
             if cell.value:
@@ -265,16 +239,16 @@ def mostrar_resumen():
 
     total_album = sum([v + (1 if k=='FWC' else 0) for k, v in CONFIG_ALBUM.items()])
     cant_tengo = len(tengo_df)
-    
+
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Progreso Total", f"{(cant_tengo/total_album)*100:.1f}%")
     c2.metric("Estampas Pegadas", cant_tengo)
     c3.metric("Faltantes", total_album - cant_tengo)
     c4.metric("Selecciones Completas", f"{completadas}/{len(CONFIG_ALBUM)}")
-    
+
     st.divider()
     modo = st.radio("Analizar por:", ["Grupos", "Selección Específica"], horizontal=True)
-    
+
     if modo == "Grupos":
         op_g = st.selectbox("Selecciona un Grupo:", list(GRUPOS.keys()))
         equipos = GRUPOS[op_g]
@@ -301,13 +275,13 @@ def mostrar_resumen():
 def vista_intercambios():
     st.title("🤝 Centro de Intercambios")
     t1, t2 = st.tabs(["🔄 Registro de Intercambio", "🔍 Comparar con Amigo"])
-    
+
     with t1:
         res = supabase.table("user_stickers").select("*").eq("user_id", st.session_state.user.id).execute()
         df_inv = pd.DataFrame(res.data) if res.data else pd.DataFrame()
-        
+
         col_recibo, col_entrego = st.columns(2)
-        
+
         # --- COLUMNA RECIBO (Doble método) ---
         with col_recibo:
             st.subheader("📥 Recibo (Me dan)")
@@ -317,7 +291,7 @@ def vista_intercambios():
                 cod_r = st.selectbox("Estampa", nums_r, key="cr")
                 if st.button("➕ Añadir Selección", key="btn_r_sel"):
                     st.session_state.carrito_recibir.append(cod_r); st.rerun()
-            
+
             with st.expander("Método 2: Lista de códigos"):
                 man_r = st.text_input("Códigos (ej: ARG1, MEX5):", key="man_r")
                 if st.button("➕ Añadir Lista", key="btn_r_man"):
@@ -432,12 +406,12 @@ import streamlit as st
 if st.session_state.user is None:
     st.title("👋 Panini Hub")
     st.sidebar.title("🔐 Acceso")
-    
+
     modo = st.sidebar.radio("¿Qué deseas hacer?", ["Entrar", "Registrarme"])
-    
+
     em = st.sidebar.text_input("Email")
     pw = st.sidebar.text_input("Contraseña", type="password")
-    
+
     if modo == "Entrar":
         if st.sidebar.button("Iniciar Sesión", use_container_width=True):
             try:
@@ -447,7 +421,7 @@ if st.session_state.user is None:
                     st.rerun()
             except Exception as e:
                 st.sidebar.error("Credenciales incorrectas")
-        
+
         # Opción para recuperar contraseña (el link que arreglamos en GitHub)
         if st.sidebar.button("¿Olvidaste tu contraseña?"):
             if em:
@@ -477,20 +451,20 @@ else:
     st.sidebar.write(f"👤 {st.session_state.user.email}")
     if st.sidebar.button("Cerrar Sesión"):
         callback_logout() # Asegúrate de tener definida esta función para limpiar el state
-    
+
     menu = st.sidebar.radio("Menú", ["🏠 Resumen", "🚩 Selecciones", "🤝 Intercambios", "📥 Exportar", "⚙️ Ajustes"])
-    
+
     if menu == "🏠 Resumen": 
         mostrar_resumen()
-        
+
     elif menu == "🚩 Selecciones":
         # ORDEN_SELECCIONES debe estar definido previamente en tu código
         sigla = st.sidebar.selectbox("Equipo", ORDEN_SELECCIONES)
-        
+
         # Consultar inventario del usuario para este equipo
         res = supabase.table("user_stickers").select("*").eq("user_id", st.session_state.user.id).eq("team_code", sigla).execute()
         inv = {item['sticker_code']: item['quantity'] for item in res.data}
-        
+
         # Generar códigos de estampas (FWC, CC o Selecciones normales)
         if sigla == 'FWC':
             cods = ['00'] + [f'FWC{i}' for i in range(1, 20)]
@@ -498,18 +472,18 @@ else:
             cods = [f'CC{i}' for i in range(1, 15)]
         else:
             cods = [f'{sigla}{i}' for i in range(1, 21)]
-            
+
         st.title(f"🚩 Selección: {sigla}")
-        
+
         # Mostrar estampas en cuadrícula de 4 columnas
         cols = st.columns(4)
         for i, c in enumerate(cods):
             cant = inv.get(c, 0)
-            
+
             # Aplicar colores según cantidad (Tengo, Falta, Repetida)
             # COLORS debe estar definido: {"Falta": "#FF4B4B", "Tengo": "#28A745", "Repetida": "#FFD700"}
             color = COLORS["Falta"] if cant == 0 else (COLORS["Tengo"] if cant == 1 else COLORS["Repetida"])
-            
+
             with cols[i % 4]:
                 st.markdown(f'''
                     <div style="border:3px solid {color}; border-radius:10px; padding:10px; text-align:center; margin-bottom:10px;">
@@ -517,7 +491,7 @@ else:
                         <p style="margin:0; font-size:14px;">Cant: {cant}</p>
                     </div>
                 ''', unsafe_allow_html=True)
-                
+
                 c1, c2 = st.columns(2)
                 if c1.button("➖", key=f"m_{c}"): 
                     actualizar_db([c], "restar") # Ajusté para pasar solo el código c
@@ -525,13 +499,13 @@ else:
                 if c2.button("➕", key=f"p_{c}"): 
                     actualizar_db([c], "sumar")
                     st.rerun()
-                
+
     elif menu == "🤝 Intercambios": 
         vista_intercambios()
-        
+
     elif menu == "📥 Exportar": 
         mostrar_exportar()
-        
+
     else:
         st.title("⚙️ Ajustes")
         st.warning("⚠️ Zona de Peligro")
