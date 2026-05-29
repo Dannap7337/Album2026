@@ -213,8 +213,8 @@ def configurar_impresion_excel(ws):
 
     # 2. Estilos Visuales (Encabezados y Cuadrícula pequeña)
     fill_header = PatternFill(start_color="14A8FD", end_color="14A8FD", fill_type="solid")
-    font_header = Font(name="Seoge UI", size=10, bold=True, color="FFFFFF")
-    font_body = Font(name="Seoge UI", size=9)
+    font_header = Font(name="Twemoji Mozilla", size=10, bold=True, color="FFFFFF")
+    font_body = Font(name="Twemoji Mozilla", size=9)
     align_center = Alignment(horizontal="center", vertical="center")
     thin_border = Border(
         left=Side(style='thin', color='DDDDDD'),
