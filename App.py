@@ -83,12 +83,141 @@ def ordenar_dataframe_panini(df):
     df_sorted = df.sort_values(by=['sel_idx', 'num_idx']).drop(columns=['sel_idx', 'num_idx'])
     return df_sorted
 
+def generar_tablero_por_grupos(df_origen, es_repetidas=False):
+    """
+    Transforma un DataFrame plano en una matriz estructurada por Grupos
+    colocados lado a lado (horizontalmente) para optimizar la impresión.
+    """
+    if df_origen.empty:
+        return pd.DataFrame()
+    
+    # Mapeo inverso: saber a qué grupo pertenece cada Selección
+    seleccion_a_grupo = {}
+    for grupo, selecciones in GRUPOS.items():
+        for sel in selecciones:
+            seleccion_a_grupo[sel] = grupo
+            
+    df = df_origen.copy()
+    # Identificar grupo de cada registro
+    df['Grupo'] = df['Selección'].apply(lambda x: seleccion_a_grupo.get(x, 'Otros'))
+    
+    # Ordenar los datos internamente por orden oficial de Panini
+    df['sel_idx'] = df['Selección'].apply(lambda x: ORDEN_SELECCIONES.index(x) if x in ORDEN_SELECCIONES else 999)
+    df['num_idx'] = df['Código'].apply(obtener_orden_numerico)
+    df = df.sort_values(by=['sel_idx', 'num_idx'])
+    
+    columnas_tablero = {}
+    max_filas = 0
+    
+    # Procesar cada grupo en el orden definido en el diccionario GRUPOS
+    for grupo in GRUPOS.keys():
+        df_grupo = df[df['Grupo'] == grupo]
+        
+        if not df_grupo.empty:
+            # Crear los textos que irán en las celdas
+            if es_repetidas:
+                # Ejemplo: "ARG5 (x2)"
+                valores = df_grupo.apply(lambda r: f"{r['Código']} (x{int(r['Cantidad Extra'])})", axis=1).tolist()
+            else:
+                # Ejemplo: "MEX3"
+                valores = df_grupo['Código'].tolist()
+        else:
+            valores = []
+            
+        columnas_tablero[grupo] = valores
+        if len(valores) > max_filas:
+            max_filas = len(valores)
+            
+    # Nivelar listas para que todas tengan la misma longitud rellenando con celdas vacías
+    tablero_final = pd.DataFrame()
+    for grupo in GRUPOS.keys():
+        lista_valores = columnas_tablero[grupo]
+        # Rellenar con strings vacíos los espacios faltantes
+        lista_valores += [""] * (max_filas - len(lista_valores))
+        
+        # Añadir al DataFrame final dejando una columna en blanco de separación decorativa
+        tablero_final[grupo] = lista_valores
+        tablero_final[f" "] = [""] * max_filas  # Columna separadora
+        
+    # Eliminar la última columna en blanco sobrante
+    if not tablero_final.empty:
+        tablero_final = tablero_final.iloc[:, :-1]
+        
+    return tablero_final
+
 def preparar_excel(df_faltantes, df_repetidas):
     output = io.BytesIO()
+    
+    # Generar las estructuras horizontales por grupos
+    tablero_faltantes = generar_tablero_por_grupos(df_faltantes, es_repetidas=False)
+    tablero_repetidas = generar_tablero_por_grupos(df_repetidas, es_repetidas=True)
+    
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        ordenar_dataframe_panini(df_faltantes).to_excel(writer, sheet_name='Faltantes', index=False)
-        ordenar_dataframe_panini(df_repetidas).to_excel(writer, sheet_name='Repetidas', index=False)
+        # Pestaña 1: Faltantes
+        if not tablero_faltantes.empty:
+            tablero_faltantes.to_excel(writer, sheet_name='Faltantes', index=False)
+            
+            # Estilizar hoja para impresión en una sola página
+            ws = writer.sheets['Faltantes']
+            configurar_impresion_excel(ws)
+        else:
+            # Hoja vacía de respaldo si no hay faltantes
+            pd.DataFrame([["¡Felicidades! No te faltan estampas."]]).to_excel(writer, sheet_name='Faltantes', index=False, header=False)
+            
+        # Pestaña 2: Repetidas
+        if not tablero_repetidas.empty:
+            tablero_repetidas.to_excel(writer, sheet_name='Repetidas', index=False)
+            ws = writer.sheets['Repetidas']
+            configurar_impresion_excel(ws)
+        else:
+            pd.DataFrame([["No tienes estampas repetidas."]]).to_excel(writer, sheet_name='Repetidas', index=False, header=False)
+            
     return output.getvalue()
+
+def configurar_impresion_excel(ws):
+    """Aplica configuraciones nativas de Excel para ajustar el contenido a 1 sola página horizontal"""
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    
+    # 1. Ajuste de página para Impresión
+    ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE  # Horizontal
+    ws.page_setup.paperSize = ws.PAPERSIZE_A4             # O ws.PAPERSIZE_LETTER según prefieras
+    ws.sheet_properties.pageSetUpPr.fitToPage = True      # Activar ajuste a la página
+    ws.page_setup.fitToWidth = 1                          # Forzar a 1 página de ancho
+    ws.page_setup.fitToHeight = 1                         # Forzar a 1 página de alto
+
+    # 2. Estilos Visuales (Encabezados y Cuadrícula pequeña)
+    fill_header = PatternFill(start_color="14A8FD", end_color="14A8FD", fill_type="solid")
+    font_header = Font(name="Arial", size=10, bold=True, color="FFFFFF")
+    font_body = Font(name="Arial", size=9)
+    align_center = Alignment(horizontal="center", vertical="center")
+    thin_border = Border(
+        left=Side(style='thin', color='DDDDDD'),
+        right=Side(style='thin', color='DDDDDD'),
+        top=Side(style='thin', color='DDDDDD'),
+        bottom=Side(style='thin', color='DDDDDD')
+    )
+
+    # Estilizar filas y columnas
+    for col_idx, col in enumerate(ws.columns, start=1):
+        header_cell = col[0]
+        
+        # Detectar si es columna de separación (nombre vacío)
+        if header_cell.value is None or str(header_cell.value).strip() == "":
+            ws.column_dimensions[header_cell.column_letter].width = 3 # Columna separadora angosta
+            continue
+            
+        # Modificar encabezados de Grupo
+        header_cell.fill = fill_header
+        header_cell.font = font_header
+        header_cell.alignment = align_center
+        ws.column_dimensions[header_cell.column_letter].width = 11 # Columnas de datos compactas
+        
+        # Estilizar las celdas de estampas inferiores
+        for cell in col[1:]:
+            if cell.value:
+                cell.font = font_body
+                cell.alignment = align_center
+                cell.border = thin_border
 
 # --- VISTAS ---
 
