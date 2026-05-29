@@ -112,7 +112,6 @@ def generar_tablero_por_grupos(df_origen, es_repetidas=False):
     # Procesar cada grupo en el orden definido en el diccionario GRUPOS
     for grupo in GRUPOS.keys():
         df_grupo = df[df['Grupo'] == grupo]
-        
         if not df_grupo.empty:
             # Crear los textos que irán en las celdas
             if es_repetidas:
@@ -137,7 +136,6 @@ def generar_tablero_por_grupos(df_origen, es_repetidas=False):
         
         # Añadir al DataFrame final dejando una columna en blanco de separación decorativa
         tablero_final[grupo] = lista_valores
-        tablero_final[f" "] = [""] * max_filas  # Columna separadora
         
     # Eliminar la última columna en blanco sobrante
     if not tablero_final.empty:
