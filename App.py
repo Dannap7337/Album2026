@@ -132,12 +132,10 @@ def generar_tablero_por_grupos(df_origen, es_repetidas=False):
     tablero_final = pd.DataFrame()
     for grupo in GRUPOS.keys():
         lista_valores = columnas_tablero[grupo]
-        # Rellenar con strings vacíos los espacios faltantes
         lista_valores += [""] * (max_filas - len(lista_valores))
 
         # Añadir al DataFrame final dejando una columna en blanco de separación decorativa
         tablero_final[grupo] = lista_valores
-        tablero_final[f" "] = [""] * max_filas  # Columna separadora
 
     # Eliminar la última columna en blanco sobrante
     if not tablero_final.empty:
