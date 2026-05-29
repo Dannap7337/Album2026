@@ -31,6 +31,18 @@ CONFIG_ALBUM = {
     'GHA': 20, 'PAN': 20
 }
 
+BANDERAS_SELECCIONES = {
+    'FWC': '🏆', 'MEX': '🇲🇽', 'RSA': '🇿🇦', 'KOR': '🇰🇷', 'CZE': '🇨🇿', 'CAN': '🇨🇦',
+    'BIH': '🇧🇦', 'QAT': '🇶🇦', 'SUI': '🇨🇭', 'BRA': '🇧🇷', 'MAR': '🇲🇦', 'HAI': '🇭🇹',
+    'SCO': '🏴󠁧󠁢󠁳󠁣󠁴󠁿', 'USA': '🇺🇸', 'PAR': '🇵🇾', 'AUS': '🇦🇺', 'TUR': '🇹🇷', 'GER': '🇩🇪',
+    'CUW': '🇨🇼', 'CIV': '🇨🇮', 'ECU': '🇪🇨', 'NED': '🇳🇱', 'JPN': '🇯🇵', 'SWE': '🇸🇪',
+    'TUN': '🇹🇳', 'CC': '🥤',  'BEL': '🇧🇪', 'EGY': '🇪🇬', 'IRN': '🇮🇷', 'NZL': '🇳🇿',
+    'ESP': '🇪🇸', 'CPV': '🇨🇻', 'KSA': '🇸🇦', 'URU': '🇺🇾', 'FRA': '🇫🇷', 'SEN': '🇸🇳',
+    'IRQ': '🇮🇶', 'NOR': '🇳🇴', 'ARG': '🇦🇷', 'ALG': '🇩🇿', 'AUT': '🇦🇹', 'JOR': '🇯🇴',
+    'POR': '🇵🇹', 'COD': '🇨🇩', 'UZB': '🇺🇿', 'COL': '🇨🇴', 'ENG': '🏴󠁧󠁢󠁥󠁮󠁧󠁿', 'CRO': '🇭🇷',
+    'GHA': '🇬🇭', 'PAN': '🇵🇦'
+}
+
 ORDEN_SELECCIONES = list(CONFIG_ALBUM.keys())
 
 GRUPOS = {
@@ -112,36 +124,52 @@ def generar_tablero_por_grupos(df_origen, es_repetidas=False):
     # Procesar cada grupo en el orden definido en el diccionario GRUPOS
     for grupo in GRUPOS.keys():
         df_grupo = df[df['Grupo'] == grupo]
+        
         if not df_grupo.empty:
-            # Crear los textos que irán en las celdas
-            if es_repetidas:
-                # Ejemplo: "ARG5 (x2)"
-                valores = df_grupo.apply(lambda r: f"{r['Código']} (x{int(r['Cantidad Extra'])})", axis=1).tolist()
-            else:
-                # Ejemplo: "MEX3"
-                valores = df_grupo['Código'].tolist()
+            # Obtener el emoji de la bandera de la selección actual
+            # (Asume que 'Selección' guarda el nombre del país, ej: 'México')
+            def formatear_celda(row):
+                pais = row['Selección']
+                bandera = BANDERAS_SELECCIONES.get(pais, "🏳️") # '🏳️' por si no encuentra el país
+                
+                if es_repetidas:
+                    return f"{bandera} {row['Código']} (x{int(row['Cantidad Extra'])})"
+                else:
+                    return f"{bandera} {row['Código']}"
+
+            # Crear los textos que irán en las celdas con su respectiva bandera
+            valores = df_grupo.apply(formatear_celda, axis=1).tolist()
         else:
             valores = []
             
-        columnas_tablero[grupo] = valores
+        # Opcional: Si quieres que el ENCABEZADO del grupo también tenga bandera
+        # Puedes buscar si el grupo coincide con algún país, si no, se queda el nombre del grupo solo
+        bandera_grupo = BANDERAS_SELECCIONES.get(grupo, "")
+        nombre_columna = f"{bandera_grupo} {grupo}".strip()
+            
+        columnas_tablero[nombre_columna] = valores
         if len(valores) > max_filas:
             max_filas = len(valores)
             
     # Nivelar listas para que todas tengan la misma longitud rellenando con celdas vacías
     tablero_final = pd.DataFrame()
-    for grupo in GRUPOS.keys():
-        lista_valores = columnas_tablero[grupo]
+    for nombre_columna in columnas_tablero.keys():
+        lista_valores = columnas_tablero[nombre_columna]
         # Rellenar con strings vacíos los espacios faltantes
-        lista_valores += [""] * (max_filas - len(lista_valores))
+        # Hacemos una copia para no alterar la lista original en el diccionario
+        lista_valores_rellena = lista_valores + [""] * (max_filas - len(lista_valores))
         
         # Añadir al DataFrame final dejando una columna en blanco de separación decorativa
-        tablero_final[grupo] = lista_valores
+        tablero_final[nombre_columna] = lista_valores_rellena
+        tablero_final[f" "] = [""] * max_filas  # Columna separadora
         
     # Eliminar la última columna en blanco sobrante
     if not tablero_final.empty:
+        # Usamos loc para evitar problemas con nombres de columnas duplicados (los espacios en blanco)
         tablero_final = tablero_final.iloc[:, :-1]
         
     return tablero_final
+
 
 def preparar_excel(df_faltantes, df_repetidas):
     output = io.BytesIO()
@@ -185,8 +213,8 @@ def configurar_impresion_excel(ws):
 
     # 2. Estilos Visuales (Encabezados y Cuadrícula pequeña)
     fill_header = PatternFill(start_color="14A8FD", end_color="14A8FD", fill_type="solid")
-    font_header = Font(name="Arial", size=10, bold=True, color="FFFFFF")
-    font_body = Font(name="Arial", size=9)
+    font_header = Font(name="Seoge UI", size=10, bold=True, color="FFFFFF")
+    font_body = Font(name="Seoge UI", size=9)
     align_center = Alignment(horizontal="center", vertical="center")
     thin_border = Border(
         left=Side(style='thin', color='DDDDDD'),
