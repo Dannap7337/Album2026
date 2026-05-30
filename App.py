@@ -130,16 +130,19 @@ def generar_tablero_por_grupos(df_origen, es_repetidas=False):
 
     # Nivelar listas para que todas tengan la misma longitud rellenando con celdas vacías
     tablero_final = pd.DataFrame()
-    for grupo in GRUPOS.keys():
-        lista_valores = columnas_tablero[grupo]
+    
+    # Iteramos sobre las llaves de los grupos
+    lista_grupos = list(GRUPOS.keys())
+    for idx, grupo in enumerate(lista_grupos):
+        lista_valores = columnas_tablero[grupo].copy()
         lista_valores += [""] * (max_filas - len(lista_valores))
 
-        # Añadir al DataFrame final dejando una columna en blanco de separación decorativa
+        # Añadimos la columna del grupo correspondiente
         tablero_final[grupo] = lista_valores
-
-    # Eliminar la última columna en blanco sobrante
-    if not tablero_final.empty:
-        tablero_final = tablero_final.iloc[:, :-1]
+        
+        # Si NO es el último grupo, añadimos una columna vacía como separación decorativa
+        if idx < len(lista_grupos) - 1:
+            tablero_final[f"sep_{idx}"] = [""] * max_filas
 
     return tablero_final
 
