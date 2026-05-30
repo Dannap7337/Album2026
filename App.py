@@ -139,10 +139,6 @@ def generar_tablero_por_grupos(df_origen, es_repetidas=False):
 
         # Añadimos la columna del grupo correspondiente
         tablero_final[grupo] = lista_valores
-        
-        # Si NO es el último grupo, añadimos una columna vacía como separación decorativa
-        if idx < len(lista_grupos) - 1:
-            tablero_final[f"sep_{idx}"] = [""] * max_filas
 
     return tablero_final
 
