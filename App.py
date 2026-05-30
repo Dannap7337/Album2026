@@ -143,6 +143,34 @@ def generar_tablero_por_grupos(df_origen, es_repetidas=False):
 
     return tablero_final
 
+def completar_album_completo_db():
+    """Genera todas las estampas del álbum con cantidad = 1 para el usuario actual."""
+    lote_upsert = []
+    
+    for team, total_req in CONFIG_ALBUM.items():
+        # Determinar el rango de estampas por selección
+        if team == 'FWC':
+            rango = ['00'] + [f'FWC{i}' for i in range(1, 20)]
+        elif team == 'CC':
+            rango = [f'CC{i}' for i in range(1, 15)]
+        else:
+            rango = [f'{team}{i}' for i in range(1, 21)]
+            
+        for cod in rango:
+            lote_upsert.append({
+                "user_id": st.session_state.user.id,
+                "sticker_code": cod,
+                "team_code": team,
+                "quantity": 1
+            })
+            
+    # Dividir en bloques si es necesario, pero para ~1000 registros un solo upsert es eficiente
+    if lote_upsert:
+        supabase.table("user_stickers").upsert(
+            lote_upsert, 
+            on_conflict="user_id,sticker_code"
+        ).execute()
+
 def preparar_excel(df_faltantes, df_repetidas):
     output = io.BytesIO()
 
@@ -506,6 +534,14 @@ else:
 
     else:
         st.title("⚙️ Ajustes")
+        st.subheader ("Atajo de Desarrollo")
+        if st.button("✨ Llenar Álbum Completo", use_container_width=True):
+            with st.spinner("Pegando todas las estampas..."):
+                completar_album_completo_db()
+            st.success("¡Felicidades completaste tu álbum!")
+            st.rerun()
+
+        st.divider()
         st.warning("⚠️ Zona de Peligro")
         if st.button("Borrar Todas Mis Estampas", type="primary"): 
             supabase.table("user_stickers").delete().eq("user_id", st.session_state.user.id).execute()
